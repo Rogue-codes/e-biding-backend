@@ -6,6 +6,8 @@ import * as bcrypt from 'bcryptjs';
 import { JwtService } from '@nestjs/jwt';
 import { UserService } from 'src/user/user.service';
 import { User } from 'src/entities/user.entity';
+import { ForgotPasswordDTO } from './dto/forgot.password.dto';
+import { genToken } from 'src/helpers/genRandomPassword';
 
 export interface IAuthResponse {
   id: number;
@@ -69,5 +71,19 @@ export class AuthService {
       user,
       access_token,
     };
+  }
+
+  async forgotPassword(payload: ForgotPasswordDTO): Promise<string> {
+    const user = await this.userService.findOne(payload.email);
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const token = genToken();
+    const hashedToken = await bcrypt.hash(token, 10);
+
+    this.userService.generateOTP(user, hashedToken);
+
+    return `token has been generated and sent to ${user.email}`;
   }
 }

@@ -1,4 +1,9 @@
-import { HttpException, Injectable, NotFoundException, Patch } from '@nestjs/common';
+import {
+  HttpException,
+  Injectable,
+  NotFoundException,
+  Patch,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from 'src/entities/user.entity';
 import { Repository } from 'typeorm';
@@ -90,37 +95,49 @@ export class UserService {
 
   async approveUser(id: number): Promise<User> {
     const token = genToken();
-    const user = await this.userRepository.findOne({
-      where: { id: id },
-    });
-
+    const user = await this.userRepository.findOne({ where: { id } });
+  
     if (!user) {
       throw new NotFoundException('User not found');
     }
-
+  
     if (user.isActive) {
       throw new HttpException('User is already active', 400);
     }
-
+  
     user.isActive = true;
-
+  
     try {
       const updatedUser = await this.userRepository.save(user);
-
+  
       const hashedToken = bcrypt.hashSync(token, 10);
-      await this.OTPRepository.save({
-        userId: updatedUser.id,
-        token: hashedToken,
-        tokenExpiresIn: new Date(Date.now() + 3600000), // Expires in 1 hour
-      });
-
-      this.mailService.sendverifyEmail(updatedUser, token);
+      await this.generateOTP(updatedUser, hashedToken);
+  
+      // Remove sensitive data before returning user object
       delete updatedUser.password;
+  
       return updatedUser;
     } catch (error) {
       throw new Error('Error updating user status or sending email');
     }
   }
+  
+  async generateOTP(user: User, token: string) {
+    try {
+      await this.OTPRepository.save({
+        userId: user.id,
+        token,
+        tokenExpiresIn: new Date(Date.now() + 3600000), // Expires in 1 hour
+      });
+  
+      this.mailService.sendverifyEmail(user, token);
+    } catch (error) {
+      // Handle potential errors during OTP generation or email sending
+      throw new Error('Error generating OTP or sending email');
+    }
+  }
+  
+
   async verifyEmail(payload: verifyEmailDto): Promise<any> {
     const user = await this.userRepository.findOne({
       where: { id: parseInt(payload.userId) },
