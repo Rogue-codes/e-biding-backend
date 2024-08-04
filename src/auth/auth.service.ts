@@ -1,4 +1,9 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AdminService } from 'src/admin/admin.service';
 import { LoginAdminDto } from 'src/admin/dto/login.admin.dto';
 import { Admin } from 'src/entities/admin.entity';
@@ -8,6 +13,7 @@ import { UserService } from 'src/user/user.service';
 import { User } from 'src/entities/user.entity';
 import { ForgotPasswordDTO } from './dto/forgot.password.dto';
 import { genToken } from 'src/helpers/genRandomPassword';
+import { ResetPasswordDto } from './dto/reset.password.dto';
 
 export interface IAuthResponse {
   id: number;
@@ -80,10 +86,40 @@ export class AuthService {
     }
 
     const token = genToken();
+    console.log('token', token);
     const hashedToken = await bcrypt.hash(token, 10);
 
-    this.userService.generateOTP(user, hashedToken);
+    this.userService.generateOTP(user, hashedToken, token);
 
     return `token has been generated and sent to ${user.email}`;
+  }
+
+  async resetPassword(payload: ResetPasswordDto): Promise<string> {
+    // Validate the OTP
+    const isOTPValid = await this.userService.confirmOtp(
+      payload.email,
+      payload.token,
+    );
+
+    console.log('first')
+
+    if (!isOTPValid) {
+      throw new UnauthorizedException('Invalid OTP');
+    }
+
+    // Find the user by email
+    const user = await this.userService.findOne(payload.email);
+    console.log('second')
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    try {
+      await this.userService.updateUser(user.id, payload.newPassword);
+      return 'Password has been reset successfully';
+    } catch (error) {
+      throw new InternalServerErrorException('Error resetting password');
+    }
   }
 }

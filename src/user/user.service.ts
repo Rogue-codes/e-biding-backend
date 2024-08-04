@@ -1,8 +1,10 @@
 import {
   HttpException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
   Patch,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from 'src/entities/user.entity';
@@ -15,6 +17,12 @@ import { genToken } from 'src/helpers/genRandomPassword';
 import { OTP } from 'src/entities/OTP.entity';
 import { verifyEmailDto } from './dto/verifyEmail.dto';
 
+interface PaginatedUsers {
+  data: User[];
+  total: number;
+  page: number;
+  limit: number;
+}
 @Injectable()
 export class UserService {
   constructor(
@@ -28,7 +36,7 @@ export class UserService {
     private readonly mailService: MailService,
   ) {}
 
-  async findOne(email: string | number): Promise<User> {
+  async findOne(email: string): Promise<User> {
     const user = await this.userRepository.findOne({
       where: {
         email: email as string,
@@ -96,77 +104,262 @@ export class UserService {
   async approveUser(id: number): Promise<User> {
     const token = genToken();
     const user = await this.userRepository.findOne({ where: { id } });
-  
+
     if (!user) {
       throw new NotFoundException('User not found');
     }
-  
+
     if (user.isActive) {
       throw new HttpException('User is already active', 400);
     }
-  
+
     user.isActive = true;
-  
+
     try {
       const updatedUser = await this.userRepository.save(user);
-  
+
       const hashedToken = bcrypt.hashSync(token, 10);
-      await this.generateOTP(updatedUser, hashedToken);
-  
+      await this.generateOTP(updatedUser, hashedToken, token);
+
       // Remove sensitive data before returning user object
       delete updatedUser.password;
-  
+
       return updatedUser;
     } catch (error) {
       throw new Error('Error updating user status or sending email');
     }
   }
-  
-  async generateOTP(user: User, token: string) {
+
+  async rejectUser(id: number): Promise<String> {
+    const user = await this.userRepository.findOneBy({ id });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.isActive) {
+      throw new HttpException('User is already active', 400);
+    }
+
     try {
-      await this.OTPRepository.save({
-        userId: user.id,
-        token,
-        tokenExpiresIn: new Date(Date.now() + 3600000), // Expires in 1 hour
+      const deletedUser = await this.userRepository.delete(user.id);
+
+      this.mailService.sendRejectedRequestMail(user);
+
+      return 'User request REJECTED Successfully';
+    } catch (error) {
+      throw new Error('Error updating user status or sending email');
+    }
+  }
+
+  async generateOTP(user: User, hashedToken: string, token: string) {
+    try {
+      // check if otp exist for the user
+      const alreadyExistingOtp = await this.OTPRepository.findOne({
+        where: {
+          userId: user.id,
+        },
       });
-  
+
+      if (!alreadyExistingOtp) {
+        await this.OTPRepository.save({
+          userId: user.id,
+          token: hashedToken,
+          tokenExpiresIn: new Date(Date.now() + 3600000), // Expires in 1 hour
+        });
+      } else {
+        Object.assign(alreadyExistingOtp, {
+          userId: user.id,
+          token: hashedToken,
+          tokenExpiresIn: new Date(Date.now() + 3600000), // Expires in 1 hour
+        });
+
+        await this.OTPRepository.save(alreadyExistingOtp);
+      }
+
       this.mailService.sendverifyEmail(user, token);
     } catch (error) {
       // Handle potential errors during OTP generation or email sending
-      throw new Error('Error generating OTP or sending email');
+      console.log(error);
+      throw new InternalServerErrorException('Error generating OTP');
     }
   }
-  
+
+  async confirmOtp(email: string, token: string) {
+    const user = await this.userRepository.findOne({ where: { email } });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const otp = await this.OTPRepository.findOne({
+      where: { userId: user.id },
+    });
+
+    if (!otp) {
+      throw new NotFoundException('OTP not found');
+    }
+
+    const tokenMatch = await bcrypt.compare(token, otp.token);
+    if (!tokenMatch) {
+      throw new UnauthorizedException('Invalid token');
+    }
+
+    await this.OTPRepository.delete(otp.Id);
+    return true;
+  }
 
   async verifyEmail(payload: verifyEmailDto): Promise<any> {
     const user = await this.userRepository.findOne({
       where: { id: parseInt(payload.userId) },
     });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
     const otp = await this.OTPRepository.findOne({
-      where: {
-        userId: parseInt(payload.userId),
-      },
+      where: { userId: user.id },
     });
 
-    if (!user || !otp) {
-      throw new NotFoundException('user not found');
+    if (!otp) {
+      throw new NotFoundException('OTP not found');
     }
 
     const tokenMatch = await bcrypt.compare(payload.token, otp.token);
     if (!tokenMatch) {
-      throw new HttpException('Invalid token', 401);
+      throw new UnauthorizedException('Invalid token');
     }
 
-    user.isVerified = true;
+    if (!user.isVerified) {
+      user.isVerified = true;
+    }
+
+    await this.OTPRepository.delete(otp.Id);
 
     try {
       const updatedUser = await this.userRepository.save(user);
+      await this.mailService.sendVerificationSuccessMail(updatedUser);
 
-      this.mailService.sendVerificationSuccessMail(updatedUser);
+      // Ensure password and other sensitive data are not included in the response
       delete updatedUser.password;
       return updatedUser;
     } catch (error) {
-      throw new Error('Error updating user status or sending email');
+      throw new InternalServerErrorException(
+        'Error updating user status or sending email',
+      );
     }
+  }
+
+  async updateUser(id: number, newPassword: string): Promise<User> {
+    const existingUser = await this.userRepository.findOne({
+      where: {
+        id,
+      },
+    });
+
+    if (!existingUser) {
+      throw new NotFoundException('User not found');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    existingUser.password = hashedPassword;
+    try {
+      await this.userRepository.save(existingUser);
+      return existingUser;
+    } catch (error) {
+      throw new InternalServerErrorException('Error reseting password');
+    }
+  }
+
+  async getUsers(
+    page: number,
+    limit: number,
+    search?: string,
+    filter?: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<{
+    data: User[];
+    total: number;
+    page: number;
+    limit: number;
+    lastPage: number;
+  }> {
+    const queryBuilder = this.userRepository.createQueryBuilder('user');
+
+    // Search functionality
+    if (search) {
+      queryBuilder
+        .where('user.firstName ILIKE :search', { search: `%${search}%` })
+        .orWhere('user.lastName ILIKE :search', { search: `%${search}%` })
+        .orWhere('user.email ILIKE :search', { search: `%${search}%` })
+        .orWhere('user.companyName ILIKE :search', { search: `%${search}%` });
+    }
+
+    // Filter functionality
+    if (filter === 'active') {
+      queryBuilder.andWhere('user.isActive = :isActive', { isActive: true });
+    }
+
+    // Filter by date functionality
+    if (startDate && endDate) {
+      queryBuilder.andWhere('user.createdAt BETWEEN :startDate AND :endDate', {
+        startDate,
+        endDate,
+      });
+    } else if (startDate) {
+      queryBuilder.andWhere('user.createdAt >= :startDate', { startDate });
+    } else if (endDate) {
+      queryBuilder.andWhere('user.createdAt <= :endDate', { endDate });
+    }
+
+    // Pagination
+    queryBuilder.skip(page > 0 ? (page - 1) * limit : 0);
+    queryBuilder.take(limit || 10);
+
+    // Selecting specific fields
+    queryBuilder.select([
+      'user.id',
+      'user.firstName',
+      'user.email',
+      'user.lastName',
+      'user.CACDoc',
+      'user.RCNumber',
+      'user.alternatePhone',
+      'user.isActive',
+      'user.companyAddress',
+      'user.companyName',
+      'user.phone',
+      'user.postalCode',
+      'user.isVerified',
+      'user.createdAt',
+    ]);
+
+    const [data, total] = await queryBuilder.getManyAndCount();
+
+    const lastPage = Math.ceil(total / (limit ? limit : 10));
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      lastPage,
+    };
+  }
+
+  async getUser(id: number): Promise<User> {
+    const user = await this.userRepository.findOneBy({
+      id,
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    delete user.password;
+
+    return user;
   }
 }

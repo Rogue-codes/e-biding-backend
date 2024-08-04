@@ -169,6 +169,75 @@ export class MailService {
     }
   }
 
+  async sendRejectedRequestMail(user: User) {
+    const mailOptions: nodemailer.SendMailOptions = {
+      from: 'nnamdidanielosuji@gmail.com',
+      to: user.email,
+      subject: 'Account Creation Failed',
+      text: 'Your account creation request has been Rejected',
+      html: `
+          <html lang="en">
+            <head>
+              <meta charset="UTF-8">
+              <title>Welcome Email</title>
+              <style>
+                body {
+                  font-family: Arial, sans-serif;
+                  background-color: #f4f4f4;
+                  margin: 0;
+                  padding: 0;
+                  line-height: 1.6;
+                }
+                .container {
+                  width: 80%;
+                  margin: 0 auto;
+                  padding: 20px;
+                  background-color: #fff;
+                  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+                  border-radius: 8px;
+                }
+                h1 {
+                  color: #333;
+                }
+                p {
+                  color: #555;
+                }
+                .verification-code {
+                  background-color: #007bff;
+                  color: #fff;
+                  padding: 10px 15px;
+                  border-radius: 4px;
+                  display: inline-block;
+                  font-weight: bold;
+                  margin-bottom: 20px;
+                  font-size: 2rem;
+                }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <h1>Dear, ${user.firstName}</h1>
+                <p>We regret to inform you that your account creation request on our platform has been rejected because your current profile doesn't not fit our company policy.</p>
+                <p>Please feel free to come back next time when you have our complete requirements.</p>
+                <p>Thanks.</p>
+                <p>If you have any questions or need assistance, feel free to contact us. We're here to help!</p>
+                <p>Best regards,</p>
+                <p>The E-Biding Team</p>
+              </div>
+            </body>
+          </html>
+        `,
+    };
+
+    try {
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log('Message sent: %s', info.messageId);
+    } catch (error) {
+      console.error('Error sending email:', error);
+      throw new Error('Failed to send email');
+    }
+  }
+
   //   async sendResetPasswordTokenMail(user: User, code: string) {
   //     const mailOptions: nodemailer.SendMailOptions = {
   //       from: 'nnamdidanielosuji@gmail.com',
