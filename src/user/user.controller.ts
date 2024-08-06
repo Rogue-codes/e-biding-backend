@@ -19,6 +19,7 @@ import { CreateUserDto } from './dto/create.user.dto';
 import { AdminGuard } from 'src/guards/admin.guard';
 import { verifyEmailDto } from './dto/verifyEmail.dto';
 import { User } from 'src/entities/user.entity';
+import { resendOtpDto } from './dto/resend.otp.dto';
 
 @Controller('user')
 export class UserController {
@@ -40,7 +41,7 @@ export class UserController {
       });
     } catch (error) {
       console.log(error);
-      return res.status(500).json({
+      return res.status(error.status).json({
         success: false,
         message: error.message,
       });
@@ -103,7 +104,24 @@ export class UserController {
       });
     }
   }
-  
+
+  @Post('resend-otp')
+  async resendOtp(@Body() payload: resendOtpDto, @Res() res) {
+    try {
+      const response = await this.userService.resendOtp(payload.userId);
+      return res.status(200).json({
+        success: true,
+        message: 'OTP resent successfully',
+      });
+    } catch (error) {
+      console.log(error);
+      return res.status(error.status).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
   @UseGuards(AdminGuard)
   @Get('all')
   async getAllUsers(
@@ -139,7 +157,8 @@ export class UserController {
         message: error.message,
       });
     }
-  }''
+  }
+  '';
   @UseGuards(AdminGuard)
   @Get(':id')
   async findUser(@Param('id') id: number, @Res() res) {

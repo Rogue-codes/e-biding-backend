@@ -49,6 +49,7 @@ export class UserService {
   }
 
   async createUser(user: CreateUserDto, file: any) {
+    const token = genToken();
     // Check if email already exists
     let existingUser: User;
     try {
@@ -97,12 +98,14 @@ export class UserService {
 
     await this.userRepository.save(newUser);
 
+    const hashedToken = bcrypt.hashSync(token, 10);
+    await this.generateOTP(newUser, hashedToken, token);
+
     delete newUser.password;
     return newUser;
   }
 
   async approveUser(id: number): Promise<User> {
-    const token = genToken();
     const user = await this.userRepository.findOne({ where: { id } });
 
     if (!user) {
@@ -117,13 +120,7 @@ export class UserService {
 
     try {
       const updatedUser = await this.userRepository.save(user);
-
-      const hashedToken = bcrypt.hashSync(token, 10);
-      await this.generateOTP(updatedUser, hashedToken, token);
-
-      // Remove sensitive data before returning user object
       delete updatedUser.password;
-
       return updatedUser;
     } catch (error) {
       throw new Error('Error updating user status or sending email');
@@ -185,6 +182,7 @@ export class UserService {
     }
   }
 
+  // reset password
   async confirmOtp(email: string, token: string) {
     const user = await this.userRepository.findOne({ where: { email } });
 
@@ -209,9 +207,21 @@ export class UserService {
     return true;
   }
 
+  async resendOtp(id: number) {
+    const user = await this.userRepository.findOne({ where: { id } });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const hashedToken = bcrypt.hashSync(genToken(), 10);
+    await this.generateOTP(user, hashedToken, genToken());
+  }
+
+  // verify account
   async verifyEmail(payload: verifyEmailDto): Promise<any> {
     const user = await this.userRepository.findOne({
-      where: { id: parseInt(payload.userId) },
+      where: { id: payload.userId },
     });
 
     if (!user) {
@@ -299,7 +309,7 @@ export class UserService {
 
     // Filter functionality
     if (filter === 'active') {
-      queryBuilder.andWhere('user.isActive = :isActive', { isActive: true });
+      queryBuilder.andWhere('user.isActive = :isActive', { isActive: false });
     }
 
     // Filter by date functionality

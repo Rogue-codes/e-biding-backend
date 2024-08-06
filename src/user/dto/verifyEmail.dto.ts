@@ -6,6 +6,6 @@ export class verifyEmailDto {
     token: string;
 
     @IsNotEmpty()
-    @IsString()
-    userId: string;
+    @IsNumber()
+    userId: number;
 }
