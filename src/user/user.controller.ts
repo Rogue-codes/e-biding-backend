@@ -157,8 +157,9 @@ export class UserController {
         message: error.message,
       });
     }
-  }
-  '';
+  };
+
+  
   @UseGuards(AdminGuard)
   @Get(':id')
   async findUser(@Param('id') id: number, @Res() res) {

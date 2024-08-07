@@ -14,6 +14,9 @@ import { User } from './entities/user.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { EmailModule } from './email/email.module';
 import { OTP } from './entities/OTP.entity';
+import { Auction } from './entities/auction.entity';
+import { Bid } from './entities/bid.entity';
+import { AuctionModule } from './auction/auction.module';
 
 dotenv.config();
 
@@ -28,7 +31,7 @@ dotenv.config();
       username: process.env.DB_USERNAME,
       password: process.env.DB_PASSWORD,
       database: process.env.DATABASE,
-      entities: [Admin, User, OTP],
+      entities: [Admin, User, OTP, Auction, Bid],
       synchronize: true,
     }),
     AdminModule,
@@ -47,6 +50,7 @@ dotenv.config();
       },
     }),
     EmailModule,
+    AuctionModule,
   ],
   controllers: [AppController],
   providers: [AppService],
