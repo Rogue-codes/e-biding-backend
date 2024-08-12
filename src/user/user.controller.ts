@@ -26,14 +26,12 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Post('register')
-  @UseInterceptors(FileInterceptor('CACDoc'))
   async createUser(
     @Body() user: CreateUserDto,
-    @UploadedFile() file: Express.Multer.File,
     @Res() res,
   ) {
     try {
-      const user_ = await this.userService.createUser(user, file);
+      const user_ = await this.userService.createUser(user);
       return res.status(200).json({
         success: true,
         message: 'User created successfully',

@@ -8,15 +8,16 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Auction } from 'src/entities/auction.entity';
 import { Repository } from 'typeorm';
 import { CreateAuctionDto } from './dto/create.auction.dto';
-import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { UpdateAuctionDto } from './dto/update.auction.dto';
+import { Bid } from 'src/entities/bid.entity';
 
 @Injectable()
 export class AuctionService {
   constructor(
     @InjectRepository(Auction)
     private readonly auctionRepository: Repository<Auction>,
-    private readonly cloudinaryService: CloudinaryService,
+    @InjectRepository(Bid)
+    private readonly bidRepository: Repository<Bid>,
   ) {}
 
   checkExistence = async (field: keyof CreateAuctionDto, value: any) => {
@@ -31,15 +32,39 @@ export class AuctionService {
     }
   };
 
-  async createAuction(auction: CreateAuctionDto, file: any): Promise<Auction> {
+  async genAuctionId() {
+    let existingAuctionId;
+
+    do {
+      const prefix = 'NGA';
+      const randomNumber = Math.floor(Math.random() * 9000) + 1000;
+      const generatedAuctionId = prefix + randomNumber;
+
+      try {
+        existingAuctionId = await this.auctionRepository.findOne({
+          where: { bidId: generatedAuctionId },
+        });
+      } catch (error) {
+        throw new InternalServerErrorException(
+          'Error fetching auctions: ' + error.message,
+        );
+      }
+
+      if (!existingAuctionId) {
+        return generatedAuctionId;
+      }
+    } while (existingAuctionId);
+
+    return null;
+  }
+
+  async createAuction(auction: CreateAuctionDto): Promise<Auction> {
     await this.checkExistence('bidId', auction.bidId);
 
-    const uploadResult = await this.cloudinaryService.uploadFile(file);
+    console.log('obj', auction);
 
     const newAuction = this.auctionRepository.create({
       ...auction,
-      itemImg: uploadResult.secure_url,
-      startingAmount: auction.startingAmount,
     });
 
     try {
@@ -74,11 +99,6 @@ export class AuctionService {
           search: `%${search}%`,
         });
     }
-
-    // Filter functionality
-    // if (filter === 'active') {
-    //   queryBuilder.andWhere('user.isActive = :isActive', { isActive: false });
-    // }
 
     // Filter by date functionality
     if (startDate && endDate) {
@@ -117,8 +137,24 @@ export class AuctionService {
 
     const lastPage = Math.ceil(total / (limit ? limit : 10));
 
+    const auctionWithBids = await Promise.all(
+      data.map(async (auction) => {
+        const bids = await this.bidRepository.find({
+          where: {
+            auction: { id: auction.id },
+          },
+          order: { createdAt: 'DESC' },
+        });
+
+        return {
+          ...auction,
+          bids,
+        };
+      }),
+    );
+
     return {
-      data,
+      data: auctionWithBids,
       total,
       page,
       limit,
@@ -153,6 +189,7 @@ export class AuctionService {
     if (existingAuctionEndDate < today) {
       throw new HttpException('Auction has already ended', 400);
     }
+
 
     Object.assign(existingAuction, auction);
 

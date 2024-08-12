@@ -5,16 +5,12 @@ import {
   Get,
   Param,
   Post,
-  Put,
   Query,
   Res,
-  UploadedFile,
   UseGuards,
-  UseInterceptors,
 } from '@nestjs/common';
 import { AuctionService } from './auction.service';
 import { CreateAuctionDto } from './dto/create.auction.dto';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { AdminGuard } from 'src/guards/admin.guard';
 import { UpdateAuctionDto } from './dto/update.auction.dto';
 
@@ -22,16 +18,34 @@ import { UpdateAuctionDto } from './dto/update.auction.dto';
 export class AuctionController {
   constructor(private readonly auctionService: AuctionService) {}
 
+  @Get('gen-id')
+  async genAuctionId(@Res() res) {
+    try {
+      const id = await this.auctionService.genAuctionId();
+      return res.status(200).json({
+        success: true,
+        message: 'auction details retrieved successfully',
+        data: { id },
+      });
+    } catch (error) {
+      console.log(error);
+      return res.status(error.status).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
   @UseGuards(AdminGuard)
   @Post('create')
-  @UseInterceptors(FileInterceptor('itemImg'))
   async createAuction(
     @Body() auction: CreateAuctionDto,
     @Res() res,
-    @UploadedFile() file: Express.Multer.File,
   ) {
+
+      console.log('updateAuction', auction);
     try {
-      const auction_ = await this.auctionService.createAuction(auction, file);
+      const auction_ = await this.auctionService.createAuction(auction);
       return res.status(201).json({
         success: true,
         message: 'Auction created successfully',
@@ -98,21 +112,21 @@ export class AuctionController {
   }
 
   @UseGuards(AdminGuard)
-  @Put('update/:id')
+  @Post('update/:id')
   async updateAuction(
     @Body() updateAuctionDto: UpdateAuctionDto,
     @Param('id') id: number,
     @Res() res,
   ): Promise<any> {
     try {
+
       const auction = await this.auctionService.updateAuction(
         id,
         updateAuctionDto,
       );
-
       return res.status(200).json({
         success: true,
-        message: 'Task updated successfully',
+        message: 'Auction updated successfully',
         data: auction,
       });
     } catch (error: any) {

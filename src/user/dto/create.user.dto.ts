@@ -40,8 +40,11 @@ export class CreateUserDto {
 
   @IsNotEmpty()
   @IsString()
+  @Length(0,10)
   RCNumber: string;
 
+  @IsNotEmpty()
+  @IsString()
   CACDoc: any;
 
   @IsNumber()

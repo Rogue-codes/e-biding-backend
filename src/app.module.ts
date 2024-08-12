@@ -9,7 +9,6 @@ import { Admin } from './entities/admin.entity';
 import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { MulterModule } from '@nestjs/platform-express';
-import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { User } from './entities/user.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { EmailModule } from './email/email.module';
@@ -17,6 +16,7 @@ import { OTP } from './entities/OTP.entity';
 import { Auction } from './entities/auction.entity';
 import { Bid } from './entities/bid.entity';
 import { AuctionModule } from './auction/auction.module';
+import { BidModule } from './bid/bid.module';
 
 dotenv.config();
 
@@ -41,7 +41,6 @@ dotenv.config();
         fieldSize: 1024 * 1024 * 10,
       },
     }),
-    CloudinaryModule,
     JwtModule.register({
       global: true,
       secret: process.env.JWT_SECRET,
@@ -51,6 +50,7 @@ dotenv.config();
     }),
     EmailModule,
     AuctionModule,
+    BidModule,
   ],
   controllers: [AppController],
   providers: [AppService],

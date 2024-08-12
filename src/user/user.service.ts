@@ -11,7 +11,6 @@ import { User } from 'src/entities/user.entity';
 import { Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create.user.dto';
 import * as bcrypt from 'bcryptjs';
-import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { MailService } from 'src/email/email.service';
 import { genToken } from 'src/helpers/genRandomPassword';
 import { OTP } from 'src/entities/OTP.entity';
@@ -31,8 +30,6 @@ export class UserService {
 
     @InjectRepository(OTP)
     private readonly OTPRepository: Repository<OTP>,
-
-    private readonly cloudinaryService: CloudinaryService,
     private readonly mailService: MailService,
   ) {}
 
@@ -48,7 +45,7 @@ export class UserService {
     return user;
   }
 
-  async createUser(user: CreateUserDto, file: any) {
+  async createUser(user: CreateUserDto) {
     const token = genToken();
     // Check if email already exists
     let existingUser: User;
@@ -86,14 +83,12 @@ export class UserService {
       checkExistence('RCNumber', user.RCNumber),
     ]);
 
-    const uploadResult = await this.cloudinaryService.uploadFile(file);
 
     const hashedPassword = bcrypt.hashSync(user.password, 10);
 
     const newUser = this.userRepository.create({
       ...user,
       password: hashedPassword,
-      CACDoc: uploadResult.secure_url,
     });
 
     await this.userRepository.save(newUser);

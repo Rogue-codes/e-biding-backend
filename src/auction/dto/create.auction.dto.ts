@@ -15,7 +15,7 @@ export class CreateAuctionDto {
   @IsNotEmpty()
   bidId: string;
 
-  @Length(0,1000)
+  @Length(0, 1000)
   @IsString()
   @IsNotEmpty()
   bidDescription: string;
@@ -25,8 +25,7 @@ export class CreateAuctionDto {
   @IsNotEmpty()
   itemDescription: string;
 
-  // @IsNumber()
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
   startingAmount: number;
 
@@ -42,6 +41,8 @@ export class CreateAuctionDto {
   @IsNotEmpty({ each: true })
   categories: string[];
 
+  @IsString()
+  @IsNotEmpty()
   itemImg: any;
 
   @IsDateString()

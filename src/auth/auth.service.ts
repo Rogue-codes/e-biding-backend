@@ -101,8 +101,6 @@ export class AuthService {
       payload.token,
     );
 
-    console.log('first')
-
     if (!isOTPValid) {
       throw new UnauthorizedException('Invalid OTP');
     }
