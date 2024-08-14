@@ -156,4 +156,22 @@ export class AuctionController {
       });
     }
   }
+
+  // @Get("highest-bid/:id")
+  // async getHighestBid(@Param('id') id: number, @Res() res) {
+  //   try {
+  //     const highestBid = await this.auctionService.getHighestBid(id);
+  //     return res.status(200).json({
+  //       success: true,
+  //       message: 'Highest bid retrieved successfully',
+  //       data: { highestBid },
+  //     });
+  //   } catch (error) {
+  //     console.log(error);
+  //     return res.status(error.status).json({
+  //       success: false,
+  //       message: error.message,
+  //     });
+  //   }
+  // }
 }

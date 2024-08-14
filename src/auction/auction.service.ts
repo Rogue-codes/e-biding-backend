@@ -162,7 +162,7 @@ export class AuctionService {
     };
   }
 
-  async getAuction(id: number): Promise<Auction> {
+  async getAuction(id: number): Promise<any> {
     const auction = await this.auctionRepository.findOneBy({
       id,
     });
@@ -171,7 +171,16 @@ export class AuctionService {
       throw new NotFoundException('auction not found');
     }
 
-    return auction;
+    const bids = await this.bidRepository.find({
+      where: { auction: { id } },
+      order: { bidAmount: 'DESC' },
+      take: 1,
+    })
+
+    const highestBid = bids[0]?.bidAmount || null;
+
+
+    return {...auction, highestBid};
   }
 
   async updateAuction(id: number, auction: UpdateAuctionDto): Promise<Auction> {
@@ -215,4 +224,17 @@ export class AuctionService {
       throw new Error('Error deleting auction');
     }
   }
+
+  // async getHighestBid(id:number){
+
+  //   const bids = await this.bidRepository.find({
+  //     where: { auction: { id } },
+  //     order: { bidAmount: 'DESC' },
+  //     take: 1,
+  //   });
+
+  //   console.log("bids", bids);
+
+  //   return bids[0];
+  // }
 }

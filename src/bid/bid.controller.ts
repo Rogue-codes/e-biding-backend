@@ -54,7 +54,7 @@ export class BidController {
       return res.status(200).json({
         success: true,
         message: 'bids retrieved successfully',
-        bids,
+        ...bids,
       });
     } catch (error) {
       console.log(error);
@@ -74,6 +74,42 @@ export class BidController {
         success: true,
         message: 'bid retrieved successfully',
         bid,
+      });
+    } catch (error) {
+      console.log(error);
+      return res.status(error.status).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  @Get('/pending/:id')
+  async getPendingBids(@Param('id') id: number, @Res() res) {
+    try {
+      const bid = await this.bidService.getPendingBids(id);
+      return res.status(200).json({
+        success: true,
+        message: 'bid retrieved successfully',
+        bid,
+      });
+    } catch (error) {
+      console.log(error);
+      return res.status(error.status).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  @Get('/related-bids/:id')
+  async getRecommendedBids(@Param('id') id: number, @Res() res) {
+    try {
+      const bids = await this.bidService.getRecommendedBids(id);
+      return res.status(200).json({
+        success: true,
+        message: 'bid retrieved successfully',
+        bids,
       });
     } catch (error) {
       console.log(error);
@@ -110,11 +146,7 @@ export class BidController {
 
   @UseGuards(UserGuard)
   @Delete(':id')
-  async withdrawBid(
-    @Param('id') id: number,
-    @Res() res,
-    @Req() req,
-  ) {
+  async withdrawBid(@Param('id') id: number, @Res() res, @Req() req) {
     try {
       const bid = await this.bidService.withdrawBid(id, req?.user?.id);
       return res.status(200).json({

@@ -15,6 +15,7 @@ import { MailService } from 'src/email/email.service';
 import { genToken } from 'src/helpers/genRandomPassword';
 import { OTP } from 'src/entities/OTP.entity';
 import { verifyEmailDto } from './dto/verifyEmail.dto';
+import { UpdateUserDto } from './dto/update.user.dto';
 
 interface PaginatedUsers {
   data: User[];
@@ -43,6 +44,21 @@ export class UserService {
       throw new NotFoundException('User not found');
     }
     return user;
+  }
+
+  async isUserActive(email: string): Promise<boolean> {
+    try {
+      const user = await this.findOne(email);
+      if (!user.isActive) {
+        return false;
+      } else {
+        return true;
+      }
+    } catch (error) {
+      throw new InternalServerErrorException(
+        'Error occurred while checking user status',
+      );
+    }
   }
 
   async createUser(user: CreateUserDto) {
@@ -82,7 +98,6 @@ export class UserService {
       checkExistence('alternatePhone', user.alternatePhone),
       checkExistence('RCNumber', user.RCNumber),
     ]);
-
 
     const hashedPassword = bcrypt.hashSync(user.password, 10);
 
@@ -256,7 +271,7 @@ export class UserService {
     }
   }
 
-  async updateUser(id: number, newPassword: string): Promise<User> {
+  async changePassword(id: number, newPassword: string): Promise<User> {
     const existingUser = await this.userRepository.findOne({
       where: {
         id,
@@ -366,5 +381,24 @@ export class UserService {
     delete user.password;
 
     return user;
+  }
+
+  async updateUser(id: number, updateUserDto: UpdateUserDto) {
+    const user = await this.userRepository.findOneBy({
+      id,
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    Object.assign(user, updateUserDto);
+
+    try {
+      await this.userRepository.save(user);
+      return user;
+    } catch (error) {
+      throw new InternalServerErrorException('Error updating user');
+    }
   }
 }

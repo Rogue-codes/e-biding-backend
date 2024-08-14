@@ -114,7 +114,7 @@ export class AuthService {
     }
 
     try {
-      await this.userService.updateUser(user.id, payload.newPassword);
+      await this.userService.changePassword(user.id, payload.newPassword);
       return 'Password has been reset successfully';
     } catch (error) {
       throw new InternalServerErrorException('Error resetting password');

@@ -12,6 +12,7 @@ import { AuctionService } from 'src/auction/auction.service';
 import { UserService } from 'src/user/user.service';
 import { User } from 'src/entities/user.entity';
 import { UpdateBidDto } from './dto/update.bid.dto';
+import { Auction } from 'src/entities/auction.entity';
 
 @Injectable()
 export class BidService {
@@ -21,6 +22,8 @@ export class BidService {
 
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(Auction)
+    private readonly auctionRepository: Repository<Auction>,
     private readonly auctionService: AuctionService,
     private readonly userService: UserService,
   ) {}
@@ -99,13 +102,15 @@ export class BidService {
       throw new NotFoundException('Auction not found');
     }
 
-    const bids = await this.bidRepository.find({
+    const [bids, total] = await this.bidRepository.findAndCount({
       where: { auction: { id: auction.id } },
       order: { bidAmount: 'DESC' },
       relations: ['user', 'auction'],
       skip: (page - 1) * limit,
       take: limit,
     });
+
+    const lastPage = Math.ceil(total / limit);
 
     // Map the response to exclude sensitive fields
     const sanitizedBids = bids.map((bid) => {
@@ -116,7 +121,7 @@ export class BidService {
       };
     });
 
-    return sanitizedBids;
+    return { bids: sanitizedBids, total, page, limit, lastPage };
   }
 
   async getBid(bidId: number): Promise<Bid> {
@@ -237,5 +242,45 @@ export class BidService {
     } catch (error) {
       throw new InternalServerErrorException('Error withdrawing bid');
     }
+  }
+
+  async getPendingBids(userId: number): Promise<Bid[]> {
+    const bids = await this.bidRepository.find({
+      where: { user: { id: userId } },
+      relations: ['user', 'auction'],
+    });
+
+    const now = new Date().getTime();
+
+    // Filter to get only pending bids
+    const pendingBids = bids.filter(
+      (bid) => new Date(bid.auction.endDate).getTime() > now,
+    );
+
+    console.log('pendingBids', pendingBids);
+
+    // Return only the pending bids
+    return pendingBids;
+  }
+
+  async getRecommendedBids(userId: number) {
+    const userBids = await this.bidRepository.find({
+      where: { user: { id: userId } },
+      relations: ['user', 'auction'],
+    });
+
+    const userCategories = userBids.flatMap((bid) =>
+      bid.auction.categories.map((category) => category),
+    );
+
+    console.log('categories: ', userCategories);
+    const auctions = await this.auctionRepository.find();
+
+    // Find bids that match the user's categories
+    const recommendedBids = auctions.filter((auction) =>
+      auction.categories.some((category) => userCategories.includes(category)),
+    );
+
+    return recommendedBids;
   }
 }
